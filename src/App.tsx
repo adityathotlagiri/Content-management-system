@@ -1,6 +1,6 @@
-// App.tsx
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { CMSRoutes } from "./routes/cmsRoutes";
+import { HomeworkRoutes } from "./routes/homeworkRoutes";
 import { CMSAuthProvider } from "./context/CMSAuthContext";
 import { ToastProvider } from "./context/ToastContext";
 import { ToastContainer } from "./Components/cms/shared/ToastContainer";
@@ -19,6 +19,15 @@ export default function App() {
                 <>
                   <CMSNav />
                   <CMSRoutes />
+                </>
+              }
+            />
+            <Route
+              path="/homework/*"
+              element={
+                <>
+                  <CMSNav />
+                  <HomeworkRoutes />
                 </>
               }
             />

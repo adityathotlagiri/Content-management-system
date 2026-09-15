@@ -1,0 +1,331 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AssignmentStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  CLOSED
+}
+
+enum AssignmentType {
+  TEXT
+  FILE_UPLOAD
+  CODE
+  MIXED
+}
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model Assignment {
+  id                    String            @id @default(cuid())
+  title                 String
+  description           String            @db.Text
+  instructions          String?           @db.Text
+  courseId              String
+  courseName            String
+  assignmentType        AssignmentType
+  difficultyLevel       DifficultyLevel
+  maxMarks              Int
+  passingMarks          Int
+  startDate             DateTime
+  submissionDeadline    DateTime
+  allowedFileTypes      String[]
+  maxFileSizeMb         Int
+  allowMultipleFiles    Boolean           @default(false)
+  maxSubmissionAttempts Int               @default(1)
+  lateSubmissionAllowed Boolean           @default(false)
+  latePenaltyPercent    Int?
+  status                AssignmentStatus  @default(DRAFT)
+  rubricId  String?
+  rubric    AssignmentRubric? @relation(fields: [rubricId], references: [id])
+  deadlineExtensions DeadlineExtension[]
+  version               Int               @default(1)
+  clonedFromId          String?
+  archivedAt            DateTime?
+
+  createdById           String
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  attachments           AssignmentAttachment[]
+  auditLogs             AssignmentAuditLog[]
+  submissions           AssignmentSubmission[]   
+  @@index([courseId])
+  @@index([status])
+  @@index([submissionDeadline])
+}
+
+model AssignmentAttachment {
+  id            String     @id @default(cuid())
+  assignmentId  String
+  assignment    Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  fileName      String
+  fileUrl       String
+  fileType      String
+  fileSizeBytes Int
+  uploadedAt    DateTime   @default(now())
+
+  @@index([assignmentId])
+}
+
+model AssignmentAuditLog {
+  id            String     @id @default(cuid())
+  assignmentId  String
+  assignment    Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  userId        String
+  action        String
+  previousValue Json?
+  newValue      Json?
+  timestamp     DateTime   @default(now())
+
+  @@index([assignmentId])
+  @@index([timestamp])
+}
+
+// server/prisma/schema.prisma — add these
+
+enum SubmissionStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  LATE
+  UNDER_REVIEW
+  GRADED
+  RESUBMISSION_REQUIRED
+}
+
+model AssignmentSubmission {
+  id                String           @id @default(cuid())
+  assignmentId      String
+  assignment        Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId         String
+  textAnswer        String?          @db.Text
+  status            SubmissionStatus @default(NOT_STARTED)
+  attemptNumber     Int              @default(1)
+  isLate            Boolean          @default(false)
+  submittedAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  feedback  Feedback?
+  attachments       SubmissionAttachment[]
+  latePenaltyApplied  Float?
+  penaltyWaived       Boolean  @default(false)
+  aiGradingResult   AIGradingResult?   
+  // A student can have multiple attempts (resubmissions), but each
+  // attempt number must be unique per student per assignment —
+  // prevents duplicate-attempt race conditions (Task 19 edge case).
+  @@unique([assignmentId, studentId, attemptNumber])
+  @@index([assignmentId])
+  @@index([studentId])
+  @@index([status])
+}
+
+
+model SubmissionAttachment {
+  id            String               @id @default(cuid())
+  submissionId  String
+  submission    AssignmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  fileName      String
+  fileUrl       String
+  fileType      String
+  fileSizeBytes Int
+  uploadedAt    DateTime             @default(now())
+
+  @@index([submissionId])
+}
+
+
+enum AIGradingStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  REQUIRES_REVIEW
+}
+
+model AIGradingResult {
+  id                 String          @id @default(cuid())
+  submissionId       String          @unique
+  submission         AssignmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  status             AIGradingStatus @default(QUEUED)
+  suggestedScore     Float?
+  confidenceScore    Float?          // 0-1
+  strengths          String[]
+  weaknesses         String[]
+  missingConcepts    String[]
+  incorrectAnswers   String[]
+  improvementSuggestions String[]
+  rawModelResponse   Json?           // full response kept for audit/debugging
+  errorMessage       String?
+  rubricEvaluations RubricEvaluation[]
+  queuedAt           DateTime        @default(now())
+  startedAt          DateTime?
+  completedAt        DateTime?
+
+  // Teacher review layer — AI result is never the final grade by itself
+  teacherApproved     Boolean?       // null = not yet reviewed
+  finalScore          Float?
+  reviewedById         String?
+  reviewedAt           DateTime?
+
+  @@index([status])
+  @@index([submissionId])
+}
+
+
+model Enrollment {
+  id         String   @id @default(cuid())
+  studentId  String
+  courseId   String
+  courseName String
+  enrolledAt DateTime @default(now())
+
+  // A student can only be enrolled once per course — prevents
+  // duplicate roster entries.
+  @@unique([studentId, courseId])
+  @@index([studentId])
+  @@index([courseId])
+}
+
+model AssignmentRubric {
+  id          String            @id @default(cuid())
+  title       String
+  description String?
+  createdById String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  criteria    RubricCriterion[]
+  assignments Assignment[]      // a rubric can be reused across many assignments
+
+  @@index([createdById])
+}
+
+model RubricCriterion {
+  id          String   @id @default(cuid())
+  rubricId    String
+  rubric      AssignmentRubric @relation(fields: [rubricId], references: [id], onDelete: Cascade)
+  title       String
+  description String?  @db.Text
+  weightage   Int      // percentage, all criteria for one rubric should sum to 100
+  maxMarks    Int
+  order       Int      @default(1)
+
+  evaluations RubricEvaluation[]
+
+  @@index([rubricId])
+}
+
+model RubricEvaluation {
+  id               String          @id @default(cuid())
+  gradingResultId  String
+  gradingResult    AIGradingResult @relation(fields: [gradingResultId], references: [id], onDelete: Cascade)
+  criterionId      String
+  criterion        RubricCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+
+  aiScore          Float           // AI's score for this criterion, 0 to criterion.maxMarks
+  aiReasoning      String          @db.Text
+  teacherScore     Float?          // set only if a teacher overrides this specific criterion
+  teacherOverridden Boolean        @default(false)
+
+  createdAt        DateTime        @default(now())
+
+  @@unique([gradingResultId, criterionId])
+  @@index([gradingResultId])
+}
+
+
+enum NotificationType {
+  ASSIGNMENT_PUBLISHED
+  DEADLINE_APPROACHING
+  DUE_TODAY
+  OVERDUE
+  SUBMISSION_SUCCESSFUL
+  GRADE_PUBLISHED
+  FEEDBACK_AVAILABLE
+  RESUBMISSION_REQUESTED
+  DEADLINE_EXTENDED
+}
+
+model Notification {
+  id           String           @id @default(cuid())
+  userId       String           // recipient — student or teacher
+  type         NotificationType
+  title        String
+  message      String
+  assignmentId String?
+  submissionId String?
+  isRead       Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+
+  @@index([userId])
+  @@index([userId, isRead])
+}
+
+
+enum FeedbackStatus {
+  DRAFT
+  APPROVED
+  PUBLISHED
+}
+
+model Feedback {
+  id                    String         @id @default(cuid())
+  submissionId          String         @unique
+  submission            AssignmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  overallComments       String         @db.Text
+  whatWentWell          String[]
+  areasForImprovement   String[]
+  specificMistakes      String[]
+  recommendedNextSteps  String[]
+  suggestedResources    String[]
+
+  teacherComments        String?        @db.Text // manual additions on top of AI-generated feedback
+  status                 FeedbackStatus @default(DRAFT)
+
+  generatedAt             DateTime      @default(now())
+  regeneratedCount         Int          @default(0)
+  approvedById              String?
+  approvedAt                DateTime?
+  publishedAt               DateTime?
+
+  @@index([submissionId])
+}
+
+model DeadlineExtension {
+  id           String   @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId    String?  // null = extension applies to whole assignment
+  oldDeadline  DateTime
+  newDeadline  DateTime
+  reason       String?
+  grantedById  String
+  createdAt    DateTime @default(now())
+
+  @@index([assignmentId])
+}
+
+model SimilarityFlag {
+  id                String   @id @default(cuid())
+  assignmentId      String
+  submissionAId     String
+  submissionBId     String
+  similarityPercent Float
+  status            String   @default("PENDING") // PENDING, REVIEWED, DISMISSED
+  createdAt         DateTime @default(now())
+
+  @@index([assignmentId])
+}
