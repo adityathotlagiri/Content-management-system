@@ -75,7 +75,7 @@ export default function SubmissionListPage() {
     if (!assignmentId) return;
     setIsChecking(true);
     try {
-      const res = await fetch(`http://localhost:4000/api/similarity/${assignmentId}/run`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/similarity/${assignmentId}/run`, {
         method: "POST",
       });
       if (!res.ok) throw new Error();

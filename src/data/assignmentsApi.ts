@@ -7,7 +7,7 @@ import  type {
 
 // Base URL for the real Express backend — swap this for an env var
 // once you have separate dev/staging/production API URLs.
-const API_BASE = "http://localhost:4000/api/assignments";
+const API_BASE = `${import.meta.env.VITE_API_URL}/api/assignments`;
 
 // Same function names/shapes as your CMS mock-data files
 // (fetchVideos, createVideo, etc.) so hooks barely change even though

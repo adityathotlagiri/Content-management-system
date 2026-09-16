@@ -1,7 +1,7 @@
 import type { AssignmentRubric, RubricCriterion } from "../types/homework";
 import type { RubricEvaluation } from "../types/homework";
 
-const API_BASE = "http://localhost:4000/api/rubrics";
+const API_BASE = `${import.meta.env.VITE_API_URL}/api/rubrics`;
 
 export interface CreateRubricPayload {
   title: string;
@@ -10,7 +10,7 @@ export interface CreateRubricPayload {
   criteria: Omit<RubricCriterion, "id">[];
 }
 export async function fetchRubricEvaluations(gradingResultId: string): Promise<RubricEvaluation[]> {
-  const res = await fetch(`http://localhost:4000/api/grading/${gradingResultId}/rubric-evaluations`);
+  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/grading/${gradingResultId}/rubric-evaluations`);
   if (!res.ok) return [];
   return res.json();
 }
@@ -22,7 +22,7 @@ export interface OverrideCriterionInput {
 }
 
 export async function overrideCriterionScore(input: OverrideCriterionInput): Promise<RubricEvaluation> {
-  const res = await fetch(`http://localhost:4000/api/grading/rubric-evaluation/override`, {
+  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/grading/rubric-evaluation/override`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

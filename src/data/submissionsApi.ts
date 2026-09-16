@@ -1,7 +1,7 @@
 import type { AssignmentSubmission } from "../types/homework";
 import type { SubmissionStatus } from "../types/homework";
 
-const API_BASE = "http://localhost:4000/api/submissions";
+const API_BASE = `${import.meta.env.VITE_API_URL}/api/submissions`;
 
 export interface SubmitAssignmentPayload {
   assignmentId: string;

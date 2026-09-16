@@ -1,6 +1,6 @@
 import type  { AIGradingResult } from "../types/homework";
 
-const API_BASE = "http://localhost:4000/api/grading";
+const API_BASE = `${import.meta.env.VITE_API_URL}/api/grading`;
 
 export async function fetchGradingResultBySubmission(
   submissionId: string

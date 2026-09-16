@@ -9,7 +9,7 @@ import { StatusBadge } from "../../cms/shared/StatusBadge";
 // Placeholder fetch until the assignment detail endpoint is wired
 // into a dedicated hook — reuses the same API_BASE pattern as assignmentsApi.
 async function fetchAssignmentById(id: string): Promise<Assignment> {
-  const res = await fetch(`http://localhost:4000/api/assignments/${id}`);
+  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/assignments/${id}`);
   if (!res.ok) throw new Error("Assignment not found");
   return res.json();
 }
